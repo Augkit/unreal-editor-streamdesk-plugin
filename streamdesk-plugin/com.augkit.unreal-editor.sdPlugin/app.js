@@ -1,5 +1,5 @@
 /// <reference path="libs/js/stream-deck.js" />
-/// <reference path="action-register.js" />
+/// <reference path="key-register.js" />
 /// <reference path="debug-action-manager.js" />
 /// <reference path="debug-action.js" />
 
@@ -13,6 +13,8 @@ stopInEditorAction.onKeyUp(({ action, context, device, event, payload }) => {
 })
 
 $SD.onConnected(({ actionInfo, appInfo, connection, messageType, port, uuid }) => {
-	$DAM.switchState('linking')
+	$DAM.switchStep('linking')
 })
+
+$DAM.start('55346')
 

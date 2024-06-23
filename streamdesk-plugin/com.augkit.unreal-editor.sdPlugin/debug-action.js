@@ -1,22 +1,19 @@
 /// <reference path="libs/js/action.js" />
 /// <reference path="debug-action-manager.js" />
-/// <reference path="action-register.js" />
+/// <reference path="key-register.js" />
 
 class DebugAction extends Action {
-    enableState = ''
-    constructor(UUID, enableState = '') {
+    enableStep = ''
+    specialKey = ''
+    constructor(UUID, enableStep = '', specialKey = '') {
         super(UUID)
-        this.enableState = enableState
+        this.enableStep = enableStep
+        this.specialKey = specialKey
         this.onWillAppear(({ action, context, device, event, payload }) => {
-            $AR.register(context, this)
-            if ($DAM.state == 'running') {
-                $SD.setState(context, 0)
-            } else {
-                $SD.setState(context, 1)
-            }
-        });
+            $KR.register(context, this)
+        })
         this.onWillDisappear(({ action, context, device, event, payload }) => {
-            $AR.unregister(context, this)
-        });
+            $KR.unregister(context, this)
+        })
     }
 }

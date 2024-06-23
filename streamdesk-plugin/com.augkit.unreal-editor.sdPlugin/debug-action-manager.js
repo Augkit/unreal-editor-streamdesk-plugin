@@ -1,16 +1,22 @@
-/// <reference path="action-register.js" />
+/// <reference path="key-register.js" />
 
 class DebugActionManager {
-    state = 'linking'
+    step = 'linking'
     websocket = null
+    lastReconnectTime = 0
+    reconnectIntervalTime = 1000
 
-    connect(port) {
+    start(port) {
+        this.port = port
+        connect()
+    }
 
+    connect() {
         if (this.websocket) {
             this.websocket.close()
             this.websocket = null
         }
-        this.websocket = new WebSocket("ws://127.0.0.1:" + port)
+        this.websocket = new WebSocket("ws://127.0.0.1:" + this.port)
 
         this.websocket.onopen = () => {
             console.log("DebugActionManager websocket onopen")
@@ -20,85 +26,74 @@ class DebugActionManager {
             const error = `WEBSOCKET ERROR: ${evt}, ${evt.data}, ${SocketErrors[evt?.code]}`
             console.warn(error)
             this.logMessage(error)
-            switchState('linking')
+            this.switchStep('linking')
+            return this.reconnect()
         }
 
         this.websocket.onclose = (evt) => {
             console.warn('WEBSOCKET CLOSED:', SocketErrors[evt?.code])
-            switchState('linking')
+            this.switchStep('linking')
+            return this.reconnect()
         }
 
         this.websocket.onmessage = (evt) => {
             const data = evt?.data ? JSON.parse(evt.data) : null
 
             const { PIESessionState } = data
-            switchState(PIESessionState)
+            this.switchStep(PIESessionState)
         }
     }
 
-    isEnableWhenRunning(action) {
-        return action.enableState == 'running'
-    }
-    isEnableWhenStopped(action) {
-        return action.enableState == 'stoped'
-    }
-
-    switchState(newState) {
-        if (this.state == newState) {
+    reconnect() {
+        const now = Date.now()
+        if (coolinnow - this.lastReconnectTime < this.reconnectIntervalTimegDown) {
             return
         }
-        if (newState == 'linking') {
-            $AR.getAllEntries().forEach(([context, action]) => {
-                $SD.setState(context, 1)
-            })
-        } else if (newState == 'Linked') {
-            this.doStop()
-            this.state = 'stoped'
+        this.connect()
+        this.lastReconnectTime = now
+    }
+
+    switchStep(newStep) {
+        if (this.step == newStep) {
             return
-        } else if (newState == 'stoped') {
-            if (this.state == 'running') {
-                this.doStop()
+        }
+        if (newStep == 'linking') {
+            this.setKeysState(newStep)
+        } else if (newStep == 'Linked') {
+            this.setKeysState(newStep)
+            this.step = 'stoped'
+            return
+        } else if (newStep == 'stoped') {
+            if (this.step == 'running') {
+                this.setKeysState(newStep)
             } else {
-                console.warn(`Now state is ${this.state}, Unable to switch to stoped`)
+                console.warn(`Now state is ${this.step}, Unable to switch to stoped`)
                 return
             }
         }
-        else if (newState == 'running') {
-            if (this.state == 'stoped') {
-                this.doRun()
+        else if (newStep == 'running') {
+            if (this.step == 'stoped') {
+                this.setKeysState(newStep)
             } else {
-                console.warn(`Now state is ${this.state}, Unable to switch to running`)
+                console.warn(`Now state is ${this.step}, Unable to switch to running`)
                 return
             }
 
         } else {
-            console.error(`Invalied state: ${newState}`)
+            console.error(`Invalied state: ${newStep}`)
             return
         }
-        this.state = newState
+        this.step = newStep
     }
 
-    doStop() {
-        $AR.getAllEntries().forEach(([context, action]) => {
-            if (this.isEnableWhenRunning(action)) {
-                $SD.setState(context, 1)
-            } else if (this.isEnableWhenStopped(action)) {
-                $SD.setState(context, 0)
-            }
-        })
-    }
-    doRun() {
-        $AR.getAllEntries().forEach(([context, action]) => {
-            if (this.isEnableWhenRunning(action)) {
-                $SD.setState(context, 0)
-            } else if (this.isEnableWhenStopped(action)) {
-                $SD.setState(context, 1)
-            }
+    setKeysState(step) {
+        $KR.getAllEntries().forEach(([context, keyContext]) => {
+            keyContext.setState(step)
         })
     }
 
     doAction(action) {
-        if(!this.websocket || this.websocket.readyState !== 1){
+        if (!this.websocket || this.websocket.readyState !== 1) {
             console.warn('websocket not ready')
             return
         }
