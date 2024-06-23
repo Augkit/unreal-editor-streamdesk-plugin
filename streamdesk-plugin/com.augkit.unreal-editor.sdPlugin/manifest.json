@@ -1,11 +1,11 @@
 {
 	"SDKVersion": 2,
-	"Author": "Elgato Systems",
+	"Author": "Methionine",
 	"CodePath": "app.html",
-	"Description": "Example description",
-	"Name": "Stream Deck Template",
-	"Icon": "actions/template/assets/action",
-	"URL": "https://www.elgato.com/en/gaming/stream-deck",
+	"Description": "A ",
+	"Name": "A stream desk plugin for unreal editor development",
+	"Icon": "actions/assets/unreal_icon",
+	"URL": "https://github.com/Augkit/unreal-editor-streamdesk-plugin",
 	"Version": "1.0.2",
 	"Software": {
 		"MinimumVersion": "5.0"
@@ -20,30 +20,42 @@
 			"MinimumVersion": "10"
 		}
 	],
-	"Category": "Template Plugin",
-	"CategoryIcon": "actions/template/assets/actionimage",
+	"Category": "Unreal Plugin",
+	"CategoryIcon": "actions/assets/unreal_icon",
 	"Actions": [
 		{
-			"Icon": "actions/template/assets/actionimage",
-			"Name": "Example Action",
-			"Controllers": ["Keypad", "Encoder"],
-			"Encoder": {
-				"layout": "$B1",
-				"TriggerDescription": {
-					"Rotate": "Describe the rotation",
-					"Push": "Describe the encoder push",
-					"Touch": "Describe the touch",
-					"LongTouch": "Describe the long touch"
-				}
-			},
+			"Icon": "actions/assets/play_in_editor",
+			"Name": "Play in Editor",
 			"States": [
 				{
-					"Image": "actions/template/assets/action"
+					"Name": "Enable",
+					"Image": "actions/assets/play_in_editor"
+				},
+				{
+					"Name": "Disable",
+					"Image": "actions/assets/play_in_editor_disable"
 				}
 			],
-			"Tooltip": "This is an example tooltip",
-			"UUID": "com.elgato.template.action",
-			"PropertyInspectorPath": "actions/template/property-inspector/inspector.html"
+			"Tooltip": "Run Unreal Editor PIE",
+			"UUID": "com.augkit.unreal-editor.playInEditor",
+			"PropertyInspectorPath": "actions/property-inspector/inspector.html"
+		},
+		{
+			"Icon": "actions/assets/stop_in_editor",
+			"Name": "Stop in Editor",
+			"States": [
+				{
+					"Name": "Enable",
+					"Image": "actions/assets/stop_in_editor"
+				},
+				{
+					"Name": "Disable",
+					"Image": "actions/assets/stop_in_editor_disable"
+				}
+			],
+			"Tooltip": "Stop Unreal Editor PIE",
+			"UUID": "com.augkit.unreal-editor.stopInEditor",
+			"PropertyInspectorPath": "actions/property-inspector/inspector.html"
 		}
 	]
 }

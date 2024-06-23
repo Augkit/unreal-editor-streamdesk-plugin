@@ -1,19 +1,18 @@
-/// <reference path="libs/js/action.js" />
 /// <reference path="libs/js/stream-deck.js" />
+/// <reference path="action-register.js" />
+/// <reference path="debug-action-manager.js" />
+/// <reference path="debug-action.js" />
 
-const myAction = new Action('com.elgato.template.action');
+const playInEditorAction = new DebugAction('com.augkit.unreal-editor.playInEditor', 'stoped');
+playInEditorAction.onKeyUp(({ action, context, device, event, payload }) => {
+	$DAM.doAction('play')
+})
+const stopInEditorAction = new DebugAction('com.augkit.unreal-editor.stopInEditor', 'running');
+stopInEditorAction.onKeyUp(({ action, context, device, event, payload }) => {
+	$DAM.doAction('stop')
+})
 
-/**
- * The first event fired when Stream Deck starts
- */
 $SD.onConnected(({ actionInfo, appInfo, connection, messageType, port, uuid }) => {
-	console.log('Stream Deck connected!');
-});
+	$DAM.switchState('linking')
+})
 
-myAction.onKeyUp(({ action, context, device, event, payload }) => {
-	console.log('Your key code goes here!');
-});
-
-myAction.onDialRotate(({ action, context, device, event, payload }) => {
-	console.log('Your dial code goes here!');
-});
