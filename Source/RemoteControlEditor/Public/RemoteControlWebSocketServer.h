@@ -63,10 +63,10 @@ protected:
 
 	UPROPERTY(config)
 	int32 WebSocketPort;
-	
+
 	UPROPERTY(config)
 	int32 CheckSessionInterval;
-	
+
 	virtual void HandleMessage(INetworkingWebSocket* ClientWebSocket, const FString& Payload);
 
 	virtual const TSharedRef<FUICommandInfo> GetLastPlaySessionCommand();
@@ -79,8 +79,10 @@ protected:
 	FString GetSessionState();
 
 	void SendSessionState(INetworkingWebSocket* ClientWebSocket);
-	
+
 	void CheckAndSendSessionState();
+
+	void SendSessionStateAfterChanged(const FString& NewSessionState);
 
 private:
 	TUniquePtr<class IWebSocketServer> ServerWebSocket;

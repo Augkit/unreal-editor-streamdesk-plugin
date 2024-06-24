@@ -40,7 +40,7 @@ void URemoteControlWebSocketServer::Initialize(FSubsystemCollectionBase& Collect
 		{
 			ServerWebSocket->Tick();
 			int64 Now = FDateTime::Now().GetTicks();
-			if(Now - TickTime >= CheckSessionInterval)
+			if (Now - TickTime >= CheckSessionInterval)
 			{
 				CheckAndSendSessionState();
 			}
@@ -124,35 +124,27 @@ void URemoteControlWebSocketServer::HandleMessage(INetworkingWebSocket* ClientWe
 	}
 	if (ActionCommand.Action == TEXT("play"))
 	{
-		FEditorState EditorState;
-		EditorState.Time = FDateTime::Now().GetTicks() / ETimespan::TicksPerMillisecond;
-		EditorState.PIESessionType = GetLastPlaySessionType();
 		TSharedRef<FUICommandInfo> Command = GetLastPlaySessionCommand();
 		if (FPlayWorldCommands::GlobalPlayWorldActions->TryExecuteAction(GetLastPlaySessionCommand()))
 		{
-			EditorState.PIESessionState = TEXT("running");
+			SendSessionStateAfterChanged(TEXT("running"));
 		}
 		else
 		{
-			EditorState.PIESessionState = TEXT("stoped");
+			SendSessionStateAfterChanged(TEXT("stoped"));
 		}
-		SendEditorState(ClientWebSocket, EditorState);
 	}
 	if (ActionCommand.Action == TEXT("stop"))
 	{
-		FEditorState EditorState;
-		EditorState.Time = FDateTime::Now().GetTicks() / ETimespan::TicksPerMillisecond;
-		EditorState.PIESessionType = GetLastPlaySessionType();
 		TSharedRef<FUICommandInfo> Command = FPlayWorldCommands::Get().StopPlaySession.ToSharedRef();
 		if (FPlayWorldCommands::GlobalPlayWorldActions->TryExecuteAction(Command))
 		{
-			EditorState.PIESessionState = TEXT("stoped");
+			SendSessionStateAfterChanged(TEXT("stoped"));
 		}
 		else
 		{
-			EditorState.PIESessionState = TEXT("running");
+			SendSessionStateAfterChanged(TEXT("running"));
 		}
-		SendEditorState(ClientWebSocket, EditorState);
 	}
 }
 
@@ -287,6 +279,19 @@ void URemoteControlWebSocketServer::CheckAndSendSessionState()
 	EditorState.Time = FDateTime::Now().GetTicks() / ETimespan::TicksPerMillisecond;
 	EditorState.PIESessionType = GetLastPlaySessionType();
 	EditorState.PIESessionState = NowSessionState;
+	for (auto Client : WebSocketClients)
+	{
+		SendEditorState(Client, EditorState);
+	}
+}
+
+void URemoteControlWebSocketServer::SendSessionStateAfterChanged(const FString& NewSessionState)
+{
+	TickTime = FDateTime::Now().GetTicks();
+	FEditorState EditorState;
+	EditorState.Time = FDateTime::Now().GetTicks() / ETimespan::TicksPerMillisecond;
+	EditorState.PIESessionType = GetLastPlaySessionType();
+	EditorState.PIESessionState = NewSessionState;
 	for (auto Client : WebSocketClients)
 	{
 		SendEditorState(Client, EditorState);
