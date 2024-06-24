@@ -2,7 +2,7 @@
 	"FileVersion": 3,
 	"Version": 1,
 	"VersionName": "0.1",
-	"FriendlyName": "RemoteControlEditor",
+	"FriendlyName": "Remote Control Editor",
 	"Description": " Control editor by WebScoket",
 	"Category": "Other",
 	"CreatedBy": "Mehtionine",

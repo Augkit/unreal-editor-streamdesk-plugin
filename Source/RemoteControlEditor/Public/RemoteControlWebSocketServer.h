@@ -1,10 +1,9 @@
-
 #pragma once
 
 #include "CoreMinimal.h"
 #include "EditorSubsystem.h"
 #include "INetworkingWebSocket.h"
-#include "RemoteControlServerEditorSubsystem.generated.h"
+#include "RemoteControlWebSocketServer.generated.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogRemoteAction, Log, All)
 
@@ -24,16 +23,27 @@ struct FEditorState
 
 	UPROPERTY()
 	FString PIESessionState;
+
+	UPROPERTY()
+	FString PIESessionType;
+
+	UPROPERTY()
+	int64 Time = 0;
 };
 
-UCLASS(config = RemoteControlServer)
-class REMOTECONTROLEDITOR_API URemoteControlServerEditorSubsystem : public UEditorSubsystem
+USTRUCT()
+struct FMyStruct
 {
 	GENERATED_BODY()
 	
-	
-public:
+};
 
+UCLASS(config = RemoteControlEditor)
+class REMOTECONTROLEDITOR_API URemoteControlWebSocketServer : public UEditorSubsystem
+{
+	GENERATED_BODY()
+
+public:
 	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
 
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
@@ -45,26 +55,29 @@ public:
 	FOnJsonRecieved OnJsonReceived;
 
 protected:
-
 	void OnWebSocketClientConnected(INetworkingWebSocket* ClientWebSocket); // to the server.
 
 	virtual void ReceivedRawPacket(void* Data, int32 Count, INetworkingWebSocket* ClientWebSocket);
 
 	UPROPERTY(config)
-	bool bUseSubsystem;
+	bool bUseSubsystem = true;
 
 	UPROPERTY(config)
-	uint32 WebSocketPort;
+	int32 WebSocketPort;
 
 	virtual void HandleMessage(INetworkingWebSocket* ClientWebSocket, const FString& Payload);
 
-	virtual void SendEditorState(INetworkingWebSocket* ClientWebSocket, const FEditorState& EditorState);
+	virtual const TSharedRef<FUICommandInfo> GetLastPlaySessionCommand();
+
+	virtual FString GetLastPlaySessionType();
+	
+	template<typename T>
+	void SendEditorState(INetworkingWebSocket* ClientWebSocket, const T& EditorState);
+
 
 private:
-
 	TUniquePtr<class IWebSocketServer> ServerWebSocket;
 
 	/** Delegate for callbacks to GameThreadTick */
 	FTSTicker::FDelegateHandle TickHandle;
-	
 };

@@ -16,5 +16,5 @@ $SD.onConnected(({ actionInfo, appInfo, connection, messageType, port, uuid }) =
 	$DAM.switchStep('linking')
 })
 
-$DAM.start('55346')
+$DAM.start('35346')
 
