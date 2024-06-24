@@ -39,6 +39,12 @@ void URemoteControlWebSocketServer::Initialize(FSubsystemCollectionBase& Collect
 		if (ServerWebSocket)
 		{
 			ServerWebSocket->Tick();
+			int64 Now = FDateTime::Now().GetTicks();
+			if(Now - TickTime >= CheckSessionInterval)
+			{
+				CheckAndSendSessionState();
+			}
+			TickTime = Now;
 			return true;
 		}
 		else
@@ -67,6 +73,14 @@ void URemoteControlWebSocketServer::OnWebSocketClientConnected(INetworkingWebSoc
 		ReceivedRawPacket(Data, Count, ClientWebSocket);
 	});
 	ClientWebSocket->SetReceiveCallBack(CallBack);
+	FWebSocketInfoCallBack ClosedCallBack;
+	ClosedCallBack.BindLambda([this, ClientWebSocket]()
+	{
+		WebSocketClients.Remove(ClientWebSocket);
+	});
+	ClientWebSocket->SetSocketClosedCallBack(ClosedCallBack);
+	WebSocketClients.Add(ClientWebSocket);
+	SendSessionState(ClientWebSocket);
 }
 
 void URemoteControlWebSocketServer::ReceivedRawPacket(void* Data, int32 Count,
@@ -77,14 +91,12 @@ void URemoteControlWebSocketServer::ReceivedRawPacket(void* Data, int32 Count,
 		return;
 	}
 
-
 	TArray<uint8> MessageData;
 	MessageData.SetNumUninitialized(Count + 1);
 	FMemory::Memcpy(MessageData.GetData(), Data, Count);
 	MessageData[Count] = '\0';
 
 	const FString JSonData = UTF8_TO_TCHAR(MessageData.GetData());
-
 	HandleMessage(ClientWebSocket, JSonData);
 	OnJsonReceived.Broadcast(JSonData);
 }
@@ -106,13 +118,9 @@ void URemoteControlWebSocketServer::HandleMessage(INetworkingWebSocket* ClientWe
 		UE_LOG(LogRemoteAction, Warning, TEXT("Can't convert json object to FActionCommand, json string: %s"),
 		       *Payload);
 	}
-	if (ActionCommand.Action == TEXT("editor_state"))
+	if (ActionCommand.Action == TEXT("session_state"))
 	{
-		FEditorState EditorState;
-		EditorState.Time = FDateTime::Now().GetTicks() / ETimespan::TicksPerMillisecond;
-		EditorState.PIESessionType = GetLastPlaySessionType();
-		EditorState.PIESessionState = GEditor->PlayWorld == nullptr ? TEXT("stoped") : TEXT("running");
-		SendEditorState(ClientWebSocket, EditorState);
+		SendSessionState(ClientWebSocket);
 	}
 	if (ActionCommand.Action == TEXT("play"))
 	{
@@ -251,6 +259,38 @@ FString URemoteControlWebSocketServer::GetLastPlaySessionType()
 		Type = TEXT("Simulate");
 	}
 	return Type;
+}
+
+FString URemoteControlWebSocketServer::GetSessionState()
+{
+	return GEditor->PlayWorld == nullptr ? TEXT("stoped") : TEXT("running");
+}
+
+void URemoteControlWebSocketServer::SendSessionState(INetworkingWebSocket* ClientWebSocket)
+{
+	FEditorState EditorState;
+	EditorState.Time = FDateTime::Now().GetTicks() / ETimespan::TicksPerMillisecond;
+	EditorState.PIESessionType = GetLastPlaySessionType();
+	EditorState.PIESessionState = GetSessionState();
+	SendEditorState(ClientWebSocket, EditorState);
+}
+
+void URemoteControlWebSocketServer::CheckAndSendSessionState()
+{
+	FString NowSessionState = GetSessionState();
+	if (LastSessionState == NowSessionState || WebSocketClients.IsEmpty())
+	{
+		return;
+	}
+	LastSessionState = NowSessionState;
+	FEditorState EditorState;
+	EditorState.Time = FDateTime::Now().GetTicks() / ETimespan::TicksPerMillisecond;
+	EditorState.PIESessionType = GetLastPlaySessionType();
+	EditorState.PIESessionState = NowSessionState;
+	for (auto Client : WebSocketClients)
+	{
+		SendEditorState(Client, EditorState);
+	}
 }
 
 template <typename T>

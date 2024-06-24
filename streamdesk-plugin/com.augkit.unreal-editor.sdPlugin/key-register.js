@@ -1,3 +1,4 @@
+/// <reference path="libs/js/stream-deck.js" />
 /// <reference path="debug-action.js" />
 
 class KeyContext {
@@ -5,7 +6,7 @@ class KeyContext {
     context
     action
     constructor(context, action) {
-        this.state = 'disable'
+        this.state = ''
         this.context = context
         this.action = action
     }
@@ -31,14 +32,14 @@ class KeyContext {
         if (this.state === 'enable') {
             return
         }
-        $SD.setState(this.context, 0)
+        $SD.setState(this.context, 1)
         this.state = 'enable'
     }
     setDisableState(step) {
         if (this.state === 'disable') {
             return
         }
-        $SD.setState(this.context, 1)
+        $SD.setState(this.context, 0)
         this.state = 'disable'
     }
 }
@@ -63,7 +64,7 @@ class KeyRegister {
         } else {
             this.contextMap[context] = new KeyContext(context, action)
         }
-        this.contextMap[context].setState($KR.step)
+        this.contextMap[context].setState($DAM.step)
     }
     unregister(context) {
         delete this.contextMap[context]

@@ -3,7 +3,7 @@
 /// <reference path="debug-action-manager.js" />
 /// <reference path="debug-action.js" />
 
-const playInEditorAction = new DebugAction('com.augkit.unreal-editor.playInEditor', 'stoped');
+const playInEditorAction = new DebugAction('com.augkit.unreal-editor.playInEditor', 'stoped', 'play');
 playInEditorAction.onKeyUp(({ action, context, device, event, payload }) => {
 	$DAM.doAction('play')
 })

@@ -28,12 +28,12 @@
 			"Name": "Play in Editor",
 			"States": [
 				{
-					"Name": "Enable",
-					"Image": "actions/assets/play_in_editor"
-				},
-				{
 					"Name": "Disable",
 					"Image": "actions/assets/play_in_editor_disable"
+				},	
+				{
+					"Name": "Enable",
+					"Image": "actions/assets/play_in_editor"
 				}
 			],
 			"Tooltip": "Run Unreal Editor PIE",
@@ -45,12 +45,12 @@
 			"Name": "Stop in Editor",
 			"States": [
 				{
-					"Name": "Enable",
-					"Image": "actions/assets/stop_in_editor"
-				},
-				{
 					"Name": "Disable",
 					"Image": "actions/assets/stop_in_editor_disable"
+				},
+				{
+					"Name": "Enable",
+					"Image": "actions/assets/stop_in_editor"
 				}
 			],
 			"Tooltip": "Stop Unreal Editor PIE",

@@ -35,7 +35,6 @@ USTRUCT()
 struct FMyStruct
 {
 	GENERATED_BODY()
-	
 };
 
 UCLASS(config = RemoteControlEditor)
@@ -64,20 +63,33 @@ protected:
 
 	UPROPERTY(config)
 	int32 WebSocketPort;
-
+	
+	UPROPERTY(config)
+	int32 CheckSessionInterval;
+	
 	virtual void HandleMessage(INetworkingWebSocket* ClientWebSocket, const FString& Payload);
 
 	virtual const TSharedRef<FUICommandInfo> GetLastPlaySessionCommand();
 
 	virtual FString GetLastPlaySessionType();
-	
-	template<typename T>
+
+	template <typename T>
 	void SendEditorState(INetworkingWebSocket* ClientWebSocket, const T& EditorState);
 
+	FString GetSessionState();
+
+	void SendSessionState(INetworkingWebSocket* ClientWebSocket);
+	
+	void CheckAndSendSessionState();
 
 private:
 	TUniquePtr<class IWebSocketServer> ServerWebSocket;
+	TArray<INetworkingWebSocket*> WebSocketClients;
+
+	FString LastSessionState;
 
 	/** Delegate for callbacks to GameThreadTick */
 	FTSTicker::FDelegateHandle TickHandle;
+
+	int64 TickTime;
 };
