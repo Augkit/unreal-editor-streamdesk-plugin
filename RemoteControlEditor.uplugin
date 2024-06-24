@@ -1,0 +1,31 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1",
+	"FriendlyName": "RemoteControlEditor",
+	"Description": " Control editor by WebScoket",
+	"Category": "Other",
+	"CreatedBy": "Mehtionine",
+	"CreatedByURL": "https://github.com/Augkit/unreal-editor-streamdesk-plugin",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": false,
+	"IsBetaVersion": true,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "RemoteControlEditor",
+			"Type": "Editor",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins":
+	[
+		{
+			"Name": "WebSocketNetworking",
+			"Enabled": true
+		}
+	]
+}

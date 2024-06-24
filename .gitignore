@@ -8,3 +8,5 @@ package-lock.json
 .history
 __exclude
 .editorconfig
+Intermediate
+Binaries
