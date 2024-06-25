@@ -48,16 +48,7 @@ public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnJsonRecieved, const FString&, Payload);
-
-	UPROPERTY(BlueprintAssignable)
-	FOnJsonRecieved OnJsonReceived;
-
 protected:
-	void OnWebSocketClientConnected(INetworkingWebSocket* ClientWebSocket); // to the server.
-
-	virtual void ReceivedRawPacket(void* Data, int32 Count, INetworkingWebSocket* ClientWebSocket);
-
 	UPROPERTY(config)
 	bool bUseSubsystem = true;
 
@@ -67,7 +58,38 @@ protected:
 	UPROPERTY(config)
 	int32 CheckSessionInterval;
 
-	virtual void HandleMessage(INetworkingWebSocket* ClientWebSocket, const FString& Payload);
+	FRunnableThread* WebSocketWorkerThread;
+};
+
+class REMOTECONTROLEDITOR_API FWebSocketServerWorker : public FRunnable
+{
+	FThreadSafeCounter ExitRequest;
+
+	uint32 WebSocketPort;
+	int32 CheckSessionInterval;
+
+	TUniquePtr<class IWebSocketServer> ServerWebSocket;
+	TArray<INetworkingWebSocket*> WebSocketClients;
+	FString LastSessionState;
+	int64 LastTickTime = 0;
+
+	FCriticalSection HandleMessageMutex;
+
+public:
+	FWebSocketServerWorker(uint32 InWebSocketPort, int32 CheckSessionInterval);
+	virtual ~FWebSocketServerWorker() override;
+
+	virtual void Exit() override;
+	virtual bool Init() override;
+	virtual uint32 Run() override;
+	virtual void Stop() override;
+
+protected:
+	void OnWebSocketClientConnected(INetworkingWebSocket* ClientWebSocket); // to the server.
+
+	void ReceivedRawPacket(void* Data, int32 Count, INetworkingWebSocket* InClientWebSocket);
+
+	void HandleMessage(INetworkingWebSocket* ClientWebSocket, const FString& Payload);
 
 	virtual const TSharedRef<FUICommandInfo> GetLastPlaySessionCommand();
 
@@ -83,15 +105,4 @@ protected:
 	void CheckAndSendSessionState();
 
 	void SendSessionStateAfterChanged(const FString& NewSessionState);
-
-private:
-	TUniquePtr<class IWebSocketServer> ServerWebSocket;
-	TArray<INetworkingWebSocket*> WebSocketClients;
-
-	FString LastSessionState;
-
-	/** Delegate for callbacks to GameThreadTick */
-	FTSTicker::FDelegateHandle TickHandle;
-
-	int64 TickTime;
 };

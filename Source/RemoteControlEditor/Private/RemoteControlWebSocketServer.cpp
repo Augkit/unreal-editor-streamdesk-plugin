@@ -20,52 +20,79 @@ bool URemoteControlWebSocketServer::ShouldCreateSubsystem(UObject* Outer) const
 
 void URemoteControlWebSocketServer::Initialize(FSubsystemCollectionBase& Collection)
 {
+	WebSocketWorkerThread = FRunnableThread::Create(new FWebSocketServerWorker(WebSocketPort, CheckSessionInterval),
+	                                                TEXT("WebSocketServerThread"), 0, TPri_AboveNormal);
+	if(WebSocketWorkerThread == nullptr)
+	{
+		UE_LOG(LogRemoteAction, Error, TEXT("Create WebSocket Server Thread Failed"));
+	}
+}
+
+void URemoteControlWebSocketServer::Deinitialize()
+{
+	WebSocketWorkerThread->Kill();
+	WebSocketWorkerThread = nullptr;
+}
+
+FWebSocketServerWorker::FWebSocketServerWorker(uint32 InWebSocketPort, int32 InCheckSessionInterval):
+	WebSocketPort(InWebSocketPort), CheckSessionInterval(InCheckSessionInterval)
+{
+}
+
+FWebSocketServerWorker::~FWebSocketServerWorker()
+{
+}
+
+void FWebSocketServerWorker::Exit()
+{
+}
+
+bool FWebSocketServerWorker::Init()
+{
+	return true;
+}
+
+uint32 FWebSocketServerWorker::Run()
+{
 	ServerWebSocket = FModuleManager::Get().LoadModuleChecked<IWebSocketNetworkingModule>(TEXT("WebSocketNetworking")).
 	                                        CreateServer();
 
 	FWebSocketClientConnectedCallBack CallBack;
-	CallBack.BindUObject(this, &URemoteControlWebSocketServer::OnWebSocketClientConnected);
+	CallBack.BindLambda([this](INetworkingWebSocket* ClientWebSocket)
+	{
+		OnWebSocketClientConnected(ClientWebSocket);
+	});
 
 	if (!ServerWebSocket->Init(WebSocketPort, CallBack))
 	{
 		UE_LOG(LogClass, Warning, TEXT("ServerWebSocket Init FAIL"));
 		ServerWebSocket.Reset();
 		CallBack.Unbind();
-		return;
+		return 1;
 	}
 
-	TickHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([&](float Time)
+	while (!ExitRequest.GetValue())
 	{
-		if (ServerWebSocket)
+		ServerWebSocket->Tick();
+		int64 Now = FDateTime::Now().GetTicks();
+		if (Now - LastTickTime >= CheckSessionInterval)
 		{
-			ServerWebSocket->Tick();
-			int64 Now = FDateTime::Now().GetTicks();
-			if (Now - TickTime >= CheckSessionInterval)
-			{
-				CheckAndSendSessionState();
-			}
-			TickTime = Now;
-			return true;
+			CheckAndSendSessionState();
 		}
-		else
-		{
-			return false;
-		}
-	}));
-}
+		FPlatformProcess::Sleep(0.02f);
+	}
 
-void URemoteControlWebSocketServer::Deinitialize()
-{
 	ServerWebSocket = nullptr;
 
-	if (TickHandle.IsValid())
-	{
-		FTSTicker::GetCoreTicker().RemoveTicker(TickHandle);
-		TickHandle.Reset();
-	}
+	return 0;
 }
 
-void URemoteControlWebSocketServer::OnWebSocketClientConnected(INetworkingWebSocket* ClientWebSocket)
+void FWebSocketServerWorker::Stop()
+{
+	ExitRequest.Set(1);
+}
+
+void FWebSocketServerWorker::OnWebSocketClientConnected(INetworkingWebSocket* ClientWebSocket)
 {
 	FWebSocketPacketReceivedCallBack CallBack;
 	CallBack.BindLambda([this, ClientWebSocket](void* Data, int32 Count)
@@ -83,8 +110,8 @@ void URemoteControlWebSocketServer::OnWebSocketClientConnected(INetworkingWebSoc
 	SendSessionState(ClientWebSocket);
 }
 
-void URemoteControlWebSocketServer::ReceivedRawPacket(void* Data, int32 Count,
-                                                      INetworkingWebSocket* ClientWebSocket)
+void FWebSocketServerWorker::ReceivedRawPacket(void* Data, int32 Count,
+                                               INetworkingWebSocket* ClientWebSocket)
 {
 	if (Count == 0) // nothing to process
 	{
@@ -98,10 +125,9 @@ void URemoteControlWebSocketServer::ReceivedRawPacket(void* Data, int32 Count,
 
 	const FString JSonData = UTF8_TO_TCHAR(MessageData.GetData());
 	HandleMessage(ClientWebSocket, JSonData);
-	OnJsonReceived.Broadcast(JSonData);
 }
 
-void URemoteControlWebSocketServer::HandleMessage(INetworkingWebSocket* ClientWebSocket, const FString& Payload)
+void FWebSocketServerWorker::HandleMessage(INetworkingWebSocket* ClientWebSocket, const FString& Payload)
 {
 	TSharedPtr<FJsonObject> JsonObject;
 	auto Reader = TJsonReaderFactory<>::Create(Payload);
@@ -124,8 +150,18 @@ void URemoteControlWebSocketServer::HandleMessage(INetworkingWebSocket* ClientWe
 	}
 	else if (ActionCommand.Action == TEXT("play"))
 	{
-		TSharedRef<FUICommandInfo> Command = GetLastPlaySessionCommand();
-		if (FPlayWorldCommands::GlobalPlayWorldActions->TryExecuteAction(GetLastPlaySessionCommand()))
+		HandleMessageMutex.Lock();
+		bool ExecuteResult;
+		AsyncTask(ENamedThreads::GameThread, [&]()
+		{
+			TSharedRef<FUICommandInfo> Command = GetLastPlaySessionCommand();
+			ExecuteResult = FPlayWorldCommands::GlobalPlayWorldActions->TryExecuteAction(GetLastPlaySessionCommand());
+			HandleMessageMutex.Unlock();
+		});
+		// Waiting async task completed
+		HandleMessageMutex.Lock();
+		HandleMessageMutex.Unlock();
+		if (ExecuteResult)
 		{
 			SendSessionStateAfterChanged(TEXT("running"));
 		}
@@ -136,8 +172,18 @@ void URemoteControlWebSocketServer::HandleMessage(INetworkingWebSocket* ClientWe
 	}
 	else if (ActionCommand.Action == TEXT("stop"))
 	{
-		TSharedRef<FUICommandInfo> Command = FPlayWorldCommands::Get().StopPlaySession.ToSharedRef();
-		if (FPlayWorldCommands::GlobalPlayWorldActions->TryExecuteAction(Command))
+		HandleMessageMutex.Lock();
+		bool ExecuteResult;
+		AsyncTask(ENamedThreads::GameThread, [&]()
+		{
+			TSharedRef<FUICommandInfo> Command = FPlayWorldCommands::Get().StopPlaySession.ToSharedRef();
+			ExecuteResult = FPlayWorldCommands::GlobalPlayWorldActions->TryExecuteAction(Command);
+			HandleMessageMutex.Unlock();
+		});
+		// Waiting async task completed
+		HandleMessageMutex.Lock();
+		HandleMessageMutex.Unlock();
+		if (ExecuteResult)
 		{
 			SendSessionStateAfterChanged(TEXT("stoped"));
 		}
@@ -148,12 +194,15 @@ void URemoteControlWebSocketServer::HandleMessage(INetworkingWebSocket* ClientWe
 	}
 	else if (ActionCommand.Action == TEXT("resume"))
 	{
-		TSharedRef<FUICommandInfo> Command = FPlayWorldCommands::Get().ResumePlaySession.ToSharedRef();
-		FPlayWorldCommands::GlobalPlayWorldActions->TryExecuteAction(Command);
+		AsyncTask(ENamedThreads::GameThread, [&]()
+		{
+			TSharedRef<FUICommandInfo> Command = FPlayWorldCommands::Get().ResumePlaySession.ToSharedRef();
+			FPlayWorldCommands::GlobalPlayWorldActions->TryExecuteAction(Command);
+		});
 	}
 }
 
-const TSharedRef<FUICommandInfo> URemoteControlWebSocketServer::GetLastPlaySessionCommand()
+const TSharedRef<FUICommandInfo> FWebSocketServerWorker::GetLastPlaySessionCommand()
 {
 	const ULevelEditorPlaySettings* PlaySettings = GetDefault<ULevelEditorPlaySettings>();
 
@@ -208,7 +257,7 @@ const TSharedRef<FUICommandInfo> URemoteControlWebSocketServer::GetLastPlaySessi
 	return Command;
 }
 
-FString URemoteControlWebSocketServer::GetLastPlaySessionType()
+FString FWebSocketServerWorker::GetLastPlaySessionType()
 {
 	const ULevelEditorPlaySettings* PlaySettings = GetDefault<ULevelEditorPlaySettings>();
 	FString Type;
@@ -258,12 +307,12 @@ FString URemoteControlWebSocketServer::GetLastPlaySessionType()
 	return Type;
 }
 
-FString URemoteControlWebSocketServer::GetSessionState()
+FString FWebSocketServerWorker::GetSessionState()
 {
 	return GEditor->PlayWorld == nullptr ? TEXT("stoped") : TEXT("running");
 }
 
-void URemoteControlWebSocketServer::SendSessionState(INetworkingWebSocket* ClientWebSocket)
+void FWebSocketServerWorker::SendSessionState(INetworkingWebSocket* ClientWebSocket)
 {
 	FEditorState EditorState;
 	EditorState.Time = FDateTime::Now().GetTicks() / ETimespan::TicksPerMillisecond;
@@ -272,7 +321,7 @@ void URemoteControlWebSocketServer::SendSessionState(INetworkingWebSocket* Clien
 	SendEditorState(ClientWebSocket, EditorState);
 }
 
-void URemoteControlWebSocketServer::CheckAndSendSessionState()
+void FWebSocketServerWorker::CheckAndSendSessionState()
 {
 	FString NowSessionState = GetSessionState();
 	if (LastSessionState == NowSessionState || WebSocketClients.IsEmpty())
@@ -290,9 +339,9 @@ void URemoteControlWebSocketServer::CheckAndSendSessionState()
 	}
 }
 
-void URemoteControlWebSocketServer::SendSessionStateAfterChanged(const FString& NewSessionState)
+void FWebSocketServerWorker::SendSessionStateAfterChanged(const FString& NewSessionState)
 {
-	TickTime = FDateTime::Now().GetTicks();
+	LastTickTime = FDateTime::Now().GetTicks();
 	FEditorState EditorState;
 	EditorState.Time = FDateTime::Now().GetTicks() / ETimespan::TicksPerMillisecond;
 	EditorState.PIESessionType = GetLastPlaySessionType();
@@ -304,8 +353,8 @@ void URemoteControlWebSocketServer::SendSessionStateAfterChanged(const FString& 
 }
 
 template <typename T>
-void URemoteControlWebSocketServer::SendEditorState(INetworkingWebSocket* ClientWebSocket,
-                                                    const T& EditorState)
+void FWebSocketServerWorker::SendEditorState(INetworkingWebSocket* ClientWebSocket,
+                                             const T& EditorState)
 {
 	if (!ClientWebSocket)
 	{

@@ -5,7 +5,7 @@
 
 const playInEditorAction = new DebugAction('com.augkit.unreal-editor.playInEditor', 'stoped', 'play');
 playInEditorAction.onKeyUp(({ action, context, device, event, payload }) => {
-	if ($KR.getKeyContetxt(context) === 'resume') {
+	if ($KR.getKeyContetxtState(context) === 'resume') {
 		$DAM.doAction('resume')
 	} else {
 		$DAM.doAction('play')
