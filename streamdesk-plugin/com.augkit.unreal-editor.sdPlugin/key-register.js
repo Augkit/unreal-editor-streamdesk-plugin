@@ -48,7 +48,7 @@ class PlayKeyContext extends KeyContext {
     setDisableState(step) {
         if (step === 'running' && this.state !== 'enable2') {
             $SD.setState(this.context, 2)
-            this.state = 'enable2'
+            this.state = 'resume'
         }
         else {
             super.setDisableState(step)
@@ -69,11 +69,17 @@ class KeyRegister {
     unregister(context) {
         delete this.contextMap[context]
     }
+    getKeyContetxt(context) {
+        return this[context]
+    }
     getAllContext() {
         return Object.keys(this.contextMap)
     }
     getAllEntries() {
         return Object.entries(this.contextMap)
+    }
+    isKeyEnable(context) {
+        return contextMap[context]?.state !== 'disable'
     }
 }
 

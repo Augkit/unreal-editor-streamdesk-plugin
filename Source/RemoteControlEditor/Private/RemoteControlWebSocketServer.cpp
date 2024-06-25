@@ -122,7 +122,7 @@ void URemoteControlWebSocketServer::HandleMessage(INetworkingWebSocket* ClientWe
 	{
 		SendSessionState(ClientWebSocket);
 	}
-	if (ActionCommand.Action == TEXT("play"))
+	else if (ActionCommand.Action == TEXT("play"))
 	{
 		TSharedRef<FUICommandInfo> Command = GetLastPlaySessionCommand();
 		if (FPlayWorldCommands::GlobalPlayWorldActions->TryExecuteAction(GetLastPlaySessionCommand()))
@@ -134,7 +134,7 @@ void URemoteControlWebSocketServer::HandleMessage(INetworkingWebSocket* ClientWe
 			SendSessionStateAfterChanged(TEXT("stoped"));
 		}
 	}
-	if (ActionCommand.Action == TEXT("stop"))
+	else if (ActionCommand.Action == TEXT("stop"))
 	{
 		TSharedRef<FUICommandInfo> Command = FPlayWorldCommands::Get().StopPlaySession.ToSharedRef();
 		if (FPlayWorldCommands::GlobalPlayWorldActions->TryExecuteAction(Command))
@@ -145,6 +145,11 @@ void URemoteControlWebSocketServer::HandleMessage(INetworkingWebSocket* ClientWe
 		{
 			SendSessionStateAfterChanged(TEXT("running"));
 		}
+	}
+	else if (ActionCommand.Action == TEXT("resume"))
+	{
+		TSharedRef<FUICommandInfo> Command = FPlayWorldCommands::Get().ResumePlaySession.ToSharedRef();
+		FPlayWorldCommands::GlobalPlayWorldActions->TryExecuteAction(Command);
 	}
 }
 

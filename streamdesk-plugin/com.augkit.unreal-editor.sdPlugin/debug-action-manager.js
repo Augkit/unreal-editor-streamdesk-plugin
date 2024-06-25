@@ -57,8 +57,8 @@ class DebugActionManager {
                 const text = await blobToText(blob);
                 const json = JSON.parse(text)
                 const { pIESessionState, time } = json
-                if(lastRemoteStateTime < time) {
-                    lastRemoteStateTime = time
+                if(this.lastRemoteStateTime < time) {
+                    this.lastRemoteStateTime = time
                     this.switchStep(pIESessionState)
                 }
             } catch (error) {

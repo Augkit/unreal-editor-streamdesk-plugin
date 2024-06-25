@@ -5,7 +5,11 @@
 
 const playInEditorAction = new DebugAction('com.augkit.unreal-editor.playInEditor', 'stoped', 'play');
 playInEditorAction.onKeyUp(({ action, context, device, event, payload }) => {
-	$DAM.doAction('play')
+	if ($KR.getKeyContetxt(context) === 'resume') {
+		$DAM.doAction('resume')
+	} else {
+		$DAM.doAction('play')
+	}
 })
 const stopInEditorAction = new DebugAction('com.augkit.unreal-editor.stopInEditor', 'running');
 stopInEditorAction.onKeyUp(({ action, context, device, event, payload }) => {
@@ -14,7 +18,5 @@ stopInEditorAction.onKeyUp(({ action, context, device, event, payload }) => {
 
 $SD.onConnected(({ actionInfo, appInfo, connection, messageType, port, uuid }) => {
 	$DAM.switchStep('linking')
+	$DAM.start('35346')
 })
-
-$DAM.start('35346')
-

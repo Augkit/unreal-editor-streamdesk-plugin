@@ -34,6 +34,10 @@
 				{
 					"Name": "Enable",
 					"Image": "actions/assets/play_in_editor"
+				},	
+				{
+					"Name": "Resume",
+					"Image": "actions/assets/resume_in_editor"
 				}
 			],
 			"Tooltip": "Run Unreal Editor PIE",
