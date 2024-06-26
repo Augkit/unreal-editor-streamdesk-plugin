@@ -11,7 +11,7 @@
       }
 
       .cls-2 {
-        fill: #595959;
+        fill: #c1c1c1;
         fill-rule: evenodd;
         opacity: .5;
       }

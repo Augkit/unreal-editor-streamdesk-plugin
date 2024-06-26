@@ -30,14 +30,50 @@
 				{
 					"Name": "Disable",
 					"Image": "actions/assets/play_in_editor_disable"
-				},	
+				},
 				{
 					"Name": "Enable",
 					"Image": "actions/assets/play_in_editor"
-				},	
+				},
 				{
-					"Name": "Resume",
+					"Name": "Resume Disable",
+					"Image": "actions/assets/resume_in_editor_disable"
+				},
+				{
+					"Name": "Resume Enable",
 					"Image": "actions/assets/resume_in_editor"
+				},
+				{
+					"Name": "Play In New Window Disable",
+					"Image": "actions/assets/play_new_window_in_editor_disable"
+				},
+				{
+					"Name": "Play In New Window Enable",
+					"Image": "actions/assets/play_new_window_in_editor"
+				},
+				{
+					"Name": "Play In Mobile Disable",
+					"Image": "actions/assets/play_mobile_in_editor_disable"
+				},
+				{
+					"Name": "Play In Mobile Enable",
+					"Image": "actions/assets/play_mobile_in_editor"
+				},
+				{
+					"Name": "Play In VR Disable",
+					"Image": "actions/assets/play_vr_in_editor_disable"
+				},
+				{
+					"Name": "Play In VR Enable",
+					"Image": "actions/assets/play_vr_in_editor"
+				},
+				{
+					"Name": "Play Standalone VR Disable",
+					"Image": "actions/assets/play_vr_standalone_editor_disable"
+				},
+				{
+					"Name": "Play Standalone VR Enable",
+					"Image": "actions/assets/play_vr_standalone_editor"
 				}
 			],
 			"Tooltip": "Run Unreal Editor PIE",
@@ -59,6 +95,108 @@
 			],
 			"Tooltip": "Stop Unreal Editor PIE",
 			"UUID": "com.augkit.unreal-editor.stopInEditor",
+			"PropertyInspectorPath": "actions/property-inspector/inspector.html"
+		},
+		{
+			"Icon": "actions/assets/debug_abort",
+			"Name": "Debug: Abort Execution",
+			"States": [
+				{
+					"Name": "Disable",
+					"Image": "actions/assets/debug_abort_disable"
+				},
+				{
+					"Name": "Enable",
+					"Image": "actions/assets/debug_abort"
+				}
+			],
+			"Tooltip": "Abort the execution",
+			"UUID": "com.augkit.unreal-editor.debugAbort",
+			"PropertyInspectorPath": "actions/property-inspector/inspector.html"
+		},
+		{
+			"Icon": "actions/assets/debug_find_node",
+			"Name": "Debug: Locate",
+			"States": [
+				{
+					"Name": "Disable",
+					"Image": "actions/assets/debug_find_node_disable"
+				},
+				{
+					"Name": "Enable",
+					"Image": "actions/assets/debug_find_node"
+				}
+			],
+			"Tooltip": "Locate the currently active node",
+			"UUID": "com.augkit.unreal-editor.debugLocate",
+			"PropertyInspectorPath": "actions/property-inspector/inspector.html"
+		},
+		{
+			"Icon": "actions/assets/debug_continue",
+			"Name": "Debug: Continue Execution",
+			"States": [
+				{
+					"Name": "Disable",
+					"Image": "actions/assets/debug_continue_disable"
+				},
+				{
+					"Name": "Enable",
+					"Image": "actions/assets/debug_continue"
+				}
+			],
+			"Tooltip": "Continue the execution",
+			"UUID": "com.augkit.unreal-editor.debugContinue",
+			"PropertyInspectorPath": "actions/property-inspector/inspector.html"
+		},
+		{
+			"Icon": "actions/assets/debug_step_into",
+			"Name": "Debug: Step Into",
+			"States": [
+				{
+					"Name": "Disable",
+					"Image": "actions/assets/debug_step_into_disable"
+				},
+				{
+					"Name": "Enable",
+					"Image": "actions/assets/debug_step_into"
+				}
+			],
+			"Tooltip": "Step Into the next node to be executed",
+			"UUID": "com.augkit.unreal-editor.debugStepInto",
+			"PropertyInspectorPath": "actions/property-inspector/inspector.html"
+		},
+		{
+			"Icon": "actions/assets/debug_step_over",
+			"Name": "Debug: Step Over",
+			"States": [
+				{
+					"Name": "Disable",
+					"Image": "actions/assets/debug_step_over_disable"
+				},
+				{
+					"Name": "Enable",
+					"Image": "actions/assets/debug_step_over"
+				}
+			],
+			"Tooltip": "Step to the next node to be executed in the current graph",
+			"UUID": "com.augkit.unreal-editor.debugStepOver",
+			"PropertyInspectorPath": "actions/property-inspector/inspector.html"
+		},
+		{
+			"Icon": "actions/assets/debug_step_out",
+			"Name": "Debug: Step Out",
+			"States": [
+				{
+					"Name": "Disable",
+					"Image": "actions/assets/debug_step_out_disable"
+				},
+				{
+					"Name": "Enable",
+					"Image": "actions/assets/debug_step_out"
+				}
+			],
+			"Tooltip": "Step Out to the next node to be executed in the parent graph",
+			"UUID": "com.augkit.unreal-editor.debugStepOut",
 			"PropertyInspectorPath": "actions/property-inspector/inspector.html"
 		}
 	]

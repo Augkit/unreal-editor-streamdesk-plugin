@@ -45,13 +45,62 @@ class KeyContext {
 }
 
 class PlayKeyContext extends KeyContext {
+    pIESessionType
+
+    constructor(...params) {
+        super(...params)
+        this.pIESessionType = ''
+    }
+    setEnableState(step) {
+        let isStateChanged = false
+        if (this.state !== 'enable') {
+            isStateChanged = true
+        }
+        const lastPIESessionType = $DAM.getPIESessionType()
+        let isPIESessionTypeChanged = false
+        if (lastPIESessionType !== this.pIESessionType) {
+            isPIESessionTypeChanged = true;
+        }
+        if (!isPIESessionTypeChanged && !isStateChanged) {
+            return
+        }
+        $SD.setState(this.context, this.getActionStateOffset(lastPIESessionType) + 1)
+        this.state = 'enable'
+        this.pIESessionType = lastPIESessionType;
+    }
     setDisableState(step) {
+        const lastPIESessionType = $DAM.getPIESessionType()
         if (step === 'running' && this.state !== 'resume') {
-            $SD.setState(this.context, 2)
+            $SD.setState(this.context, 3)
             this.state = 'resume'
         }
         else {
-            super.setDisableState(step)
+            let isStateChanged = false
+            if (this.state !== 'disable') {
+                isStateChanged = true
+            }
+            let isPIESessionTypeChanged = false
+            if (lastPIESessionType !== this.pIESessionType) {
+                isPIESessionTypeChanged = true;
+            }
+            $SD.setState(this.context, this.getActionStateOffset(lastPIESessionType))
+            this.state = 'disable'
+        }
+        this.pIESessionType = lastPIESessionType;
+    }
+    getActionStateOffset(pIESessionType) {
+        if (pIESessionType === 'EditorFloating') {
+            return 4
+        } else if (pIESessionType === 'MobilePreview') {
+            return 6
+        } else if (pIESessionType === 'VR') {
+            return 8
+        } else if (pIESessionType === 'Simulate') {
+            return 2
+        } else if (pIESessionType === 'NewProcess') {
+            return 10
+        } else {
+            return 0
         }
     }
 }

@@ -22,7 +22,7 @@ void URemoteControlWebSocketServer::Initialize(FSubsystemCollectionBase& Collect
 {
 	WebSocketWorkerThread = FRunnableThread::Create(new FWebSocketServerWorker(WebSocketPort, CheckSessionInterval),
 	                                                TEXT("WebSocketServerThread"), 0, TPri_AboveNormal);
-	if(WebSocketWorkerThread == nullptr)
+	if (WebSocketWorkerThread == nullptr)
 	{
 		UE_LOG(LogRemoteAction, Error, TEXT("Create WebSocket Server Thread Failed"));
 	}
@@ -35,7 +35,7 @@ void URemoteControlWebSocketServer::Deinitialize()
 }
 
 FWebSocketServerWorker::FWebSocketServerWorker(uint32 InWebSocketPort, int32 InCheckSessionInterval):
-	WebSocketPort(InWebSocketPort), CheckSessionInterval(InCheckSessionInterval)
+	WebSocketPort(InWebSocketPort), CheckSessionInterval(InCheckSessionInterval * ETimespan::TicksPerMillisecond)
 {
 }
 
@@ -78,6 +78,7 @@ uint32 FWebSocketServerWorker::Run()
 		if (Now - LastTickTime >= CheckSessionInterval)
 		{
 			CheckAndSendSessionState();
+			LastTickTime = Now;
 		}
 		FPlatformProcess::Sleep(0.02f);
 	}
@@ -196,8 +197,64 @@ void FWebSocketServerWorker::HandleMessage(INetworkingWebSocket* ClientWebSocket
 	{
 		AsyncTask(ENamedThreads::GameThread, [&]()
 		{
-			TSharedRef<FUICommandInfo> Command = FPlayWorldCommands::Get().ResumePlaySession.ToSharedRef();
-			FPlayWorldCommands::GlobalPlayWorldActions->TryExecuteAction(Command);
+			FPlayWorldCommands::GlobalPlayWorldActions->TryExecuteAction(
+				FPlayWorldCommands::Get().ResumePlaySession.ToSharedRef());
+		});
+	}
+	else if (ActionCommand.Action == TEXT("debug_locate"))
+	{
+		AsyncTask(ENamedThreads::GameThread, [&]()
+		{
+			FPlayWorldCommands::GlobalPlayWorldActions->TryExecuteAction(
+				FPlayWorldCommands::Get().ShowCurrentStatement.ToSharedRef());
+		});
+	}
+	else if (ActionCommand.Action == TEXT("debug_abort"))
+	{
+		AsyncTask(ENamedThreads::GameThread, [&]()
+		{
+			FPlayWorldCommands::GlobalPlayWorldActions->TryExecuteAction(
+				FPlayWorldCommands::Get().AbortExecution.ToSharedRef());
+		});
+	}
+	else if (ActionCommand.Action == TEXT("debug_continue"))
+	{
+		AsyncTask(ENamedThreads::GameThread, [&]()
+		{
+			FPlayWorldCommands::GlobalPlayWorldActions->TryExecuteAction(
+				FPlayWorldCommands::Get().ContinueExecution.ToSharedRef());
+		});
+	}
+	else if (ActionCommand.Action == TEXT("debug_abort"))
+	{
+		AsyncTask(ENamedThreads::GameThread, [&]()
+		{
+			FPlayWorldCommands::GlobalPlayWorldActions->TryExecuteAction(
+				FPlayWorldCommands::Get().AbortExecution.ToSharedRef());
+		});
+	}
+	else if (ActionCommand.Action == TEXT("debug_step_over"))
+	{
+		AsyncTask(ENamedThreads::GameThread, [&]()
+		{
+			FPlayWorldCommands::GlobalPlayWorldActions->TryExecuteAction(
+				FPlayWorldCommands::Get().StepOver.ToSharedRef());
+		});
+	}
+	else if (ActionCommand.Action == TEXT("debug_step_into"))
+	{
+		AsyncTask(ENamedThreads::GameThread, [&]()
+		{
+			FPlayWorldCommands::GlobalPlayWorldActions->TryExecuteAction(
+				FPlayWorldCommands::Get().StepInto.ToSharedRef());
+		});
+	}
+	else if (ActionCommand.Action == TEXT("debug_step_out"))
+	{
+		AsyncTask(ENamedThreads::GameThread, [&]()
+		{
+			FPlayWorldCommands::GlobalPlayWorldActions->TryExecuteAction(
+				FPlayWorldCommands::Get().StepOut.ToSharedRef());
 		});
 	}
 }

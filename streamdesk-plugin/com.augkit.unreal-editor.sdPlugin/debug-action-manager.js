@@ -19,6 +19,7 @@ class DebugActionManager {
     lastReconnectTime = Date.now()
     reconnectIntervalTime = 1000
     lastRemoteStateTime = 0
+    lastRemoteState = null
 
     start(port) {
         this.port = port
@@ -38,15 +39,13 @@ class DebugActionManager {
         }
 
         this.websocket.onerror = (evt) => {
-            const error = `WEBSOCKET ERROR: ${evt}, ${evt.data}, ${SocketErrors[evt?.code]}`
-            console.warn(error)
-            $SD.logMessage(error)
             this.switchStep('linking')
+            this.websocket.close()
+            this.websocket = null
             return this.reconnect()
         }
 
         this.websocket.onclose = (evt) => {
-            console.warn('WEBSOCKET CLOSED:', SocketErrors[evt?.code])
             this.switchStep('linking')
             return this.reconnect()
         }
@@ -59,17 +58,18 @@ class DebugActionManager {
                 const { pIESessionState, time } = json
                 if(this.lastRemoteStateTime < time) {
                     this.lastRemoteStateTime = time
+                    this.lastRemoteState = json
                     this.switchStep(pIESessionState)
                 }
             } catch (error) {
-                console.error('转换出错：', error);
+                console.error(error);
             }
         }
     }
 
     reconnect() {
         const now = Date.now()
-        if (now - this.lastReconnectTime < this.reconnectIntervalTime) {
+        if (this.lastReconnectTime === 0 || (now - this.lastReconnectTime < this.reconnectIntervalTime)) {
             return
         }
         this.lastReconnectTime = Date.now()
@@ -125,6 +125,10 @@ class DebugActionManager {
         this.websocket.send(JSON.stringify({
             Action: action,
         }))
+    }
+
+    getPIESessionType() {
+        return this.lastRemoteState?.pIESessionType || ''
     }
 }
 
