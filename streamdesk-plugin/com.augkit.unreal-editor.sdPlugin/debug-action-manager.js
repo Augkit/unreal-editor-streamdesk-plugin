@@ -14,24 +14,30 @@ function blobToText(blob) {
 }
 
 class DebugActionManager {
-    step = 'linking'
+    defaultIP = '127.0.0.1'
+    defaultPort = '35346'
+    ip = null
+    port = null
     websocket = null
-    lastReconnectTime = Date.now()
+    waitingReconnect = false
     reconnectIntervalTime = 1000
+    step = 'linking'
     lastRemoteStateTime = 0
     lastRemoteState = null
 
-    start(port) {
+    start  (ip, port, force = false)  {
+        ip = (ip || this.defaultIP)
+        port = (port || this.defaultPort)
+        if (!force && ip === this.ip && port === this.port) {
+            return
+        }
+        this.ip = ip
         this.port = port
-        return this.connect()
+        return this.tryConnect(force)
     }
 
-    connect() {
-        if (this.websocket) {
-            this.websocket.close()
-            this.websocket = null
-        }
-        this.websocket = new WebSocket("ws://127.0.0.1:" + this.port)
+    connect ()  {
+        this.websocket = new WebSocket(`ws://${this.ip}:${this.port}`)
 
         this.websocket.onopen = () => {
             console.log("DebugActionManager websocket onopen")
@@ -40,14 +46,7 @@ class DebugActionManager {
 
         this.websocket.onerror = (evt) => {
             this.switchStep('linking')
-            this.websocket.close()
-            this.websocket = null
-            return this.reconnect()
-        }
-
-        this.websocket.onclose = (evt) => {
-            this.switchStep('linking')
-            return this.reconnect()
+            return this.tryConnect()
         }
 
         this.websocket.onmessage = async (evt) => {
@@ -56,7 +55,7 @@ class DebugActionManager {
                 const text = await blobToText(blob);
                 const json = JSON.parse(text)
                 const { pIESessionState, time } = json
-                if(this.lastRemoteStateTime < time) {
+                if (this.lastRemoteStateTime < time) {
                     this.lastRemoteStateTime = time
                     this.lastRemoteState = json
                     this.switchStep(pIESessionState)
@@ -67,15 +66,26 @@ class DebugActionManager {
         }
     }
 
-    reconnect() {
-        const now = Date.now()
-        if (this.lastReconnectTime === 0 || (now - this.lastReconnectTime < this.reconnectIntervalTime)) {
+    tryConnect (force = false)  {
+        if (!force && this.waitingReconnect) {
             return
         }
-        this.lastReconnectTime = Date.now()
-        setTimeout(() => {
+        if (force) {
+            if (this.websocket) {
+                this.websocket.close()
+                this.websocket = null
+            }
             return this.connect()
-        }, this.reconnectIntervalTime);
+        } else {
+            setTimeout(() => {
+                this.waitingReconnect = false
+                if (force && !!this.websocket && (this.websocket.readyState === WebSocket.OPEN || this.websocket.readyState === WebSocket.CONNECTING)) {
+                    this.websocket.close()
+                    this.websocket = null
+                }
+                return this.connect()
+            }, this.reconnectIntervalTime);
+        }
     }
 
     switchStep(newStep) {

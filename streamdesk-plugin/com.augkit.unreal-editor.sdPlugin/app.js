@@ -16,7 +16,6 @@ stopInEditorAction.onKeyUp(({ action, context, device, event, payload }) => {
 	$DAM.doAction('stop')
 })
 
-
 const debugLocateAction = new DebugAction('com.augkit.unreal-editor.debugLocate', 'running');
 debugLocateAction.onKeyUp(({ action, context, device, event, payload }) => {
 	$DAM.doAction('debug_locate')
@@ -42,17 +41,11 @@ debugStepOutAction.onKeyUp(({ action, context, device, event, payload }) => {
 	$DAM.doAction('debug_step_out')
 })
 
-let websocket
 $SD.onConnected(({ actionInfo, appInfo, connection, messageType, port, uuid }) => {
+	$SD.getGlobalSettings()
 	$DAM.switchStep('linking')
-	$DAM.start('35346')
-
-	// websocket = new WebSocket("ws://127.0.0.1:" + "11111")
-
-	// websocket.onopen = () => {
-	// }
-
-	// websocket.onerror = (evt) => {
-	// 	websocket.close()
-	// }
+	// $DAM.start('', '')
+})
+$SD.onDidReceiveGlobalSettings(({ payload }) => {
+	$DAM.start(payload?.settings?.ip, payload?.settings?.port, true)
 })
