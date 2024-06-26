@@ -25,7 +25,7 @@ class DebugActionManager {
     lastRemoteStateTime = 0
     lastRemoteState = null
 
-    start  (ip, port, force = false)  {
+    start(ip, port, force = false) {
         ip = (ip || this.defaultIP)
         port = (port || this.defaultPort)
         if (!force && ip === this.ip && port === this.port) {
@@ -36,7 +36,7 @@ class DebugActionManager {
         return this.tryConnect(force)
     }
 
-    connect ()  {
+    connect() {
         this.websocket = new WebSocket(`ws://${this.ip}:${this.port}`)
 
         this.websocket.onopen = () => {
@@ -66,7 +66,7 @@ class DebugActionManager {
         }
     }
 
-    tryConnect (force = false)  {
+    tryConnect(force = false) {
         if (!force && this.waitingReconnect) {
             return
         }
