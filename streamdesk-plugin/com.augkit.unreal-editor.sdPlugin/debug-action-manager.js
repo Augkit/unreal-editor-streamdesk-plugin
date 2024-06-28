@@ -19,71 +19,61 @@ class DebugActionManager {
     ip = null
     port = null
     websocket = null
-    waitingReconnect = false
+
+    intervalID = null
+    needReconnect = true
     reconnectIntervalTime = 1000
+
     step = 'linking'
     lastRemoteStateTime = 0
     lastRemoteState = null
 
-    start(ip, port, force = false) {
+    connect = (ip, port) => {
         ip = (ip || this.defaultIP)
         port = (port || this.defaultPort)
-        if (!force && ip === this.ip && port === this.port) {
+        if (ip === this.ip && port === this.port) {
             return
         }
         this.ip = ip
         this.port = port
-        return this.tryConnect(force)
-    }
-
-    connect() {
-        this.websocket = new WebSocket(`ws://${this.ip}:${this.port}`)
-
-        this.websocket.onopen = () => {
-            console.log("DebugActionManager websocket onopen")
-            this.switchStep('linked')
-        }
-
-        this.websocket.onerror = (evt) => {
-            this.switchStep('linking')
-            return this.tryConnect()
-        }
-
-        this.websocket.onmessage = async (evt) => {
-            const blob = evt?.data ? evt.data : null
-            try {
-                const text = await blobToText(blob);
-                const json = JSON.parse(text)
-                const { pIESessionState, time } = json
-                if (this.lastRemoteStateTime < time) {
-                    this.lastRemoteStateTime = time
-                    this.lastRemoteState = json
-                    this.switchStep(pIESessionState)
+        this.needReconnect = true
+        if (this.intervalID === null) {
+            this.intervalID = setInterval(() => {
+                if (this.needReconnect) {
+                    if (this.websocket?.readyState === WebSocket.OPEN || this.websocket?.readyState === WebSocket.CONNECTING) {
+                        this.websocket.close()
+                        this.websocket = null
+                    }
+                    this.needReconnect = false
                 }
-            } catch (error) {
-                console.error(error);
-            }
-        }
-    }
-
-    tryConnect(force = false) {
-        if (!force && this.waitingReconnect) {
-            return
-        }
-        if (force) {
-            if (this.websocket) {
-                this.websocket.close()
-                this.websocket = null
-            }
-            return this.connect()
-        } else {
-            setTimeout(() => {
-                this.waitingReconnect = false
-                if (force && !!this.websocket && (this.websocket.readyState === WebSocket.OPEN || this.websocket.readyState === WebSocket.CONNECTING)) {
-                    this.websocket.close()
+                if (this.websocket?.readyState === WebSocket.CLOSED) {
                     this.websocket = null
                 }
-                return this.connect()
+                if (this.websocket === null) {
+                    this.websocket = new WebSocket(`ws://${this.ip}:${this.port}`)
+                    this.websocket.onopen = () => {
+                        console.log("Connected to Unreal Editor")
+                        this.switchStep('linked')
+                    }
+                    this.websocket.onclose = () => {
+                        this.switchStep('linking')
+                    }
+                    this.websocket.onmessage = async (evt) => {
+                        const blob = evt?.data ? evt.data : null
+                        try {
+                            const text = await blobToText(blob);
+                            const json = JSON.parse(text)
+                            const { pIESessionState, time } = json
+                            if (this.lastRemoteStateTime < time) {
+                                this.lastRemoteStateTime = time
+                                this.lastRemoteState = json
+                                this.switchStep(pIESessionState)
+                            }
+                        } catch (error) {
+                            console.error(error);
+                        }
+                    }
+                }
             }, this.reconnectIntervalTime);
         }
     }

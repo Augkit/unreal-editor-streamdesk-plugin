@@ -44,8 +44,8 @@ debugStepOutAction.onKeyUp(({ action, context, device, event, payload }) => {
 $SD.onConnected(({ actionInfo, appInfo, connection, messageType, port, uuid }) => {
 	$SD.getGlobalSettings()
 	$DAM.switchStep('linking')
-	// $DAM.start('', '')
 })
+
 $SD.onDidReceiveGlobalSettings(({ payload }) => {
-	$DAM.start(payload?.settings?.ip, payload?.settings?.port, true)
+	$DAM.connect(payload?.settings?.ip, payload?.settings?.port)
 })
