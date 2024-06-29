@@ -7,52 +7,99 @@
 #include "IWebSocketNetworkingModule.h"
 #include "IWebSocketServer.h"
 #include "JsonObjectConverter.h"
-#include "LevelEditor.h"
+#include "RemoteControlEditor.h"
+#include "RemoteControlEditorSettings.h"
 #include "WebSocketNetworkingDelegates.h"
 #include "Kismet2/DebuggerCommands.h"
 
 DEFINE_LOG_CATEGORY(LogRemoteAction)
 
-bool URemoteControlWebSocketServer::ShouldCreateSubsystem(UObject* Outer) const
-{
-	return bUseSubsystem;
-}
-
 void URemoteControlWebSocketServer::Initialize(FSubsystemCollectionBase& Collection)
 {
-	WebSocketWorkerThread = FRunnableThread::Create(new FWebSocketServerWorker(WebSocketPort, CheckSessionInterval),
-	                                                TEXT("WebSocketServerThread"), 0, TPri_AboveNormal);
-	if (WebSocketWorkerThread == nullptr)
-	{
-		UE_LOG(LogRemoteAction, Error, TEXT("Create WebSocket Server Thread Failed"));
-	}
+	Super::Initialize(Collection);
+	FRemoteControlEditorModule& Module = FModuleManager::LoadModuleChecked<FRemoteControlEditorModule>(FName(TEXT("RemoteControlEditor")));
+	Module.InitWebSocketServer();
 }
 
 void URemoteControlWebSocketServer::Deinitialize()
 {
-	WebSocketWorkerThread->Kill();
-	WebSocketWorkerThread = nullptr;
+	StopWebSocketServer();
 }
 
-FWebSocketServerWorker::FWebSocketServerWorker(uint32 InWebSocketPort, int32 InCheckSessionInterval):
+bool URemoteControlWebSocketServer::StartWebSocketServer()
+{
+	if (WebSocketServerThread.IsValid())
+	{
+		UE_LOG(LogRemoteAction, Warning, TEXT("WebSocket Server Already Running"));
+		return true;
+	}
+	const URemoteControlEditorSettings* Settings = GetDefault<URemoteControlEditorSettings>();
+	WebSocketServerThread = MakeUnique<FWebSocketServerThread>(Settings->WebSocketPort, Settings->CheckSessionInterval);
+	WebSocketServerThread->OnWebSocketServerOpen.AddLambda([this]()
+	{
+		AsyncTask(ENamedThreads::GameThread, [this]()
+		{
+			this->OnWebSocketServerOpen.Broadcast();
+		});
+	});
+	WebSocketServerThread->OnWebSocketServerClosed.AddLambda([this]()
+	{
+		AsyncTask(ENamedThreads::GameThread, [this]()
+		{
+			this->OnWebSocketServerClosed.Broadcast();
+		});
+	});
+	return WebSocketServerThread->StartThread();
+}
+
+bool URemoteControlWebSocketServer::RestartWebSocketServer()
+{
+	StopWebSocketServer();
+	return StartWebSocketServer();
+}
+
+void URemoteControlWebSocketServer::StopWebSocketServer()
+{
+	if (!WebSocketServerThread.IsValid())
+	{
+		return;
+	}
+	WebSocketServerThread = nullptr;
+}
+
+FWebSocketServerThread::FWebSocketServerThread(uint32 InWebSocketPort, int32 InCheckSessionInterval):
 	WebSocketPort(InWebSocketPort), CheckSessionInterval(InCheckSessionInterval * ETimespan::TicksPerMillisecond)
 {
 }
 
-FWebSocketServerWorker::~FWebSocketServerWorker()
+FWebSocketServerThread::~FWebSocketServerThread()
 {
+	StopThread();
 }
 
-void FWebSocketServerWorker::Exit()
+bool FWebSocketServerThread::StartThread()
 {
-}
-
-bool FWebSocketServerWorker::Init()
-{
+	Thread = FRunnableThread::Create(this, TEXT("WebSocketServerThread"), 0, TPri_AboveNormal);
+	if (Thread == nullptr)
+	{
+		UE_LOG(LogRemoteAction, Error, TEXT("Create WebSocket Server Thread Failed"));
+		return false;
+	}
 	return true;
 }
 
-uint32 FWebSocketServerWorker::Run()
+void FWebSocketServerThread::StopThread()
+{
+	if (Thread == nullptr)
+	{
+		return;
+	}
+	Thread->Kill(true);
+	delete Thread;
+	Thread = nullptr;
+}
+
+uint32 FWebSocketServerThread::Run()
 {
 	ServerWebSocket = FModuleManager::Get().LoadModuleChecked<IWebSocketNetworkingModule>(TEXT("WebSocketNetworking")).
 	                                        CreateServer();
@@ -68,8 +115,10 @@ uint32 FWebSocketServerWorker::Run()
 		UE_LOG(LogClass, Warning, TEXT("ServerWebSocket Init FAIL"));
 		ServerWebSocket.Reset();
 		CallBack.Unbind();
+		OnWebSocketServerClosed.Broadcast();
 		return 1;
 	}
+	OnWebSocketServerOpen.Broadcast();
 
 	while (!ExitRequest.GetValue())
 	{
@@ -82,18 +131,18 @@ uint32 FWebSocketServerWorker::Run()
 		}
 		FPlatformProcess::Sleep(0.02f);
 	}
-
 	ServerWebSocket = nullptr;
+	OnWebSocketServerClosed.Broadcast();
 
 	return 0;
 }
 
-void FWebSocketServerWorker::Stop()
+void FWebSocketServerThread::Stop()
 {
 	ExitRequest.Set(1);
 }
 
-void FWebSocketServerWorker::OnWebSocketClientConnected(INetworkingWebSocket* ClientWebSocket)
+void FWebSocketServerThread::OnWebSocketClientConnected(INetworkingWebSocket* ClientWebSocket)
 {
 	FWebSocketPacketReceivedCallBack CallBack;
 	CallBack.BindLambda([this, ClientWebSocket](void* Data, int32 Count)
@@ -111,7 +160,7 @@ void FWebSocketServerWorker::OnWebSocketClientConnected(INetworkingWebSocket* Cl
 	SendSessionState(ClientWebSocket);
 }
 
-void FWebSocketServerWorker::ReceivedRawPacket(void* Data, int32 Count,
+void FWebSocketServerThread::ReceivedRawPacket(void* Data, int32 Count,
                                                INetworkingWebSocket* ClientWebSocket)
 {
 	if (Count == 0) // nothing to process
@@ -128,7 +177,7 @@ void FWebSocketServerWorker::ReceivedRawPacket(void* Data, int32 Count,
 	HandleMessage(ClientWebSocket, JSonData);
 }
 
-void FWebSocketServerWorker::HandleMessage(INetworkingWebSocket* ClientWebSocket, const FString& Payload)
+void FWebSocketServerThread::HandleMessage(INetworkingWebSocket* ClientWebSocket, const FString& Payload)
 {
 	TSharedPtr<FJsonObject> JsonObject;
 	auto Reader = TJsonReaderFactory<>::Create(Payload);
@@ -259,7 +308,7 @@ void FWebSocketServerWorker::HandleMessage(INetworkingWebSocket* ClientWebSocket
 	}
 }
 
-const TSharedRef<FUICommandInfo> FWebSocketServerWorker::GetLastPlaySessionCommand()
+const TSharedRef<FUICommandInfo> FWebSocketServerThread::GetLastPlaySessionCommand()
 {
 	const ULevelEditorPlaySettings* PlaySettings = GetDefault<ULevelEditorPlaySettings>();
 
@@ -314,7 +363,7 @@ const TSharedRef<FUICommandInfo> FWebSocketServerWorker::GetLastPlaySessionComma
 	return Command;
 }
 
-FString FWebSocketServerWorker::GetLastPlaySessionType()
+FString FWebSocketServerThread::GetLastPlaySessionType()
 {
 	const ULevelEditorPlaySettings* PlaySettings = GetDefault<ULevelEditorPlaySettings>();
 	FString Type;
@@ -364,12 +413,12 @@ FString FWebSocketServerWorker::GetLastPlaySessionType()
 	return Type;
 }
 
-FString FWebSocketServerWorker::GetSessionState()
+FString FWebSocketServerThread::GetSessionState()
 {
 	return GEditor->PlayWorld == nullptr ? TEXT("stoped") : TEXT("running");
 }
 
-void FWebSocketServerWorker::SendSessionState(INetworkingWebSocket* ClientWebSocket)
+void FWebSocketServerThread::SendSessionState(INetworkingWebSocket* ClientWebSocket)
 {
 	FEditorState EditorState;
 	EditorState.Time = FDateTime::Now().GetTicks() / ETimespan::TicksPerMillisecond;
@@ -378,7 +427,7 @@ void FWebSocketServerWorker::SendSessionState(INetworkingWebSocket* ClientWebSoc
 	SendEditorState(ClientWebSocket, EditorState);
 }
 
-void FWebSocketServerWorker::CheckAndSendSessionState()
+void FWebSocketServerThread::CheckAndSendSessionState()
 {
 	FString NowSessionState = GetSessionState();
 	if (LastSessionState == NowSessionState || WebSocketClients.IsEmpty())
@@ -396,7 +445,7 @@ void FWebSocketServerWorker::CheckAndSendSessionState()
 	}
 }
 
-void FWebSocketServerWorker::SendSessionStateAfterChanged(const FString& NewSessionState)
+void FWebSocketServerThread::SendSessionStateAfterChanged(const FString& NewSessionState)
 {
 	LastTickTime = FDateTime::Now().GetTicks();
 	FEditorState EditorState;
@@ -410,7 +459,7 @@ void FWebSocketServerWorker::SendSessionStateAfterChanged(const FString& NewSess
 }
 
 template <typename T>
-void FWebSocketServerWorker::SendEditorState(INetworkingWebSocket* ClientWebSocket,
+void FWebSocketServerThread::SendEditorState(INetworkingWebSocket* ClientWebSocket,
                                              const T& EditorState)
 {
 	if (!ClientWebSocket)

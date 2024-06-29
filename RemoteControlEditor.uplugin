@@ -3,7 +3,7 @@
 	"Version": 1,
 	"VersionName": "0.1",
 	"FriendlyName": "Remote Control Editor",
-	"Description": " Control editor by WebScoket",
+	"Description": " Control editor by WebSocket",
 	"Category": "Other",
 	"CreatedBy": "Mehtionine",
 	"CreatedByURL": "https://github.com/Augkit/unreal-editor-streamdesk-plugin",

@@ -20,4 +20,6 @@ public:
 
 public:
 	TSharedPtr< FUICommandInfo > PluginAction;
+	TSharedPtr< FUICommandInfo > RestartAction;
+	TSharedPtr< FUICommandInfo > SettingsAction;
 };

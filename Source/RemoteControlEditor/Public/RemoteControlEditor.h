@@ -15,15 +15,18 @@ public:
 	/** IModuleInterface implementation */
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
-	
-	/** This function will be bound to Command. */
-	void PluginButtonClicked();
+
+	void InitWebSocketServer();
 	
 private:
 
 	void RegisterMenus();
 
+	void StartWebSocketServer();
+	void HandleWebSocketServerOpen();
+	void HandleWebSocketServerClosed();
 
+	void OpenSettingsPanel();
 private:
 	TSharedPtr<class FUICommandList> PluginCommands;
 };

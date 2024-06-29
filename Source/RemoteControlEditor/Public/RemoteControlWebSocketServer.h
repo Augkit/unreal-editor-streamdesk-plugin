@@ -7,6 +7,9 @@
 
 DECLARE_LOG_CATEGORY_EXTERN(LogRemoteAction, Log, All)
 
+DECLARE_MULTICAST_DELEGATE(FOnWebSocketServerOpen)
+DECLARE_MULTICAST_DELEGATE(FOnWebSocketServerClosed)
+
 USTRUCT()
 struct FActionCommand
 {
@@ -31,44 +34,37 @@ struct FEditorState
 	int64 Time = 0;
 };
 
-USTRUCT()
-struct FMyStruct
-{
-	GENERATED_BODY()
-};
-
-UCLASS(config = RemoteControlEditor)
+UCLASS()
 class REMOTECONTROLEDITOR_API URemoteControlWebSocketServer : public UEditorSubsystem
 {
 	GENERATED_BODY()
 
 public:
-	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
-
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
+	bool StartWebSocketServer();
+	bool RestartWebSocketServer();
+	void StopWebSocketServer();
+
+	FOnWebSocketServerOpen OnWebSocketServerOpen;
+	FOnWebSocketServerClosed OnWebSocketServerClosed;
+
 protected:
-	UPROPERTY(config)
-	bool bUseSubsystem = true;
-
-	UPROPERTY(config)
-	int32 WebSocketPort;
-
-	UPROPERTY(config)
-	int32 CheckSessionInterval;
-
-	FRunnableThread* WebSocketWorkerThread;
+	TUniquePtr<class FWebSocketServerThread> WebSocketServerThread;
 };
 
-class REMOTECONTROLEDITOR_API FWebSocketServerWorker : public FRunnable
+class REMOTECONTROLEDITOR_API FWebSocketServerThread : public FRunnable
 {
+protected:
 	FThreadSafeCounter ExitRequest;
 
 	uint32 WebSocketPort;
 	int32 CheckSessionInterval;
 
-	TUniquePtr<class IWebSocketServer> ServerWebSocket;
+	FRunnableThread* Thread = nullptr;
+
+	TUniquePtr<class IWebSocketServer> ServerWebSocket = nullptr;
 	TArray<INetworkingWebSocket*> WebSocketClients;
 	FString LastSessionState;
 	int64 LastTickTime = 0;
@@ -76,13 +72,17 @@ class REMOTECONTROLEDITOR_API FWebSocketServerWorker : public FRunnable
 	FCriticalSection HandleMessageMutex;
 
 public:
-	FWebSocketServerWorker(uint32 InWebSocketPort, int32 CheckSessionInterval);
-	virtual ~FWebSocketServerWorker() override;
+	FWebSocketServerThread(uint32 InWebSocketPort, int32 CheckSessionInterval);
+	virtual ~FWebSocketServerThread() override;
 
-	virtual void Exit() override;
-	virtual bool Init() override;
+	bool StartThread();
+	void StopThread();
+
 	virtual uint32 Run() override;
 	virtual void Stop() override;
+
+	FOnWebSocketServerOpen OnWebSocketServerOpen;
+	FOnWebSocketServerClosed OnWebSocketServerClosed;
 
 protected:
 	void OnWebSocketClientConnected(INetworkingWebSocket* ClientWebSocket); // to the server.

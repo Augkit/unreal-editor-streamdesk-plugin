@@ -1,39 +1,50 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "RemoteControlEditor.h"
+
+#include "ISettingsModule.h"
 #include "RemoteControlEditorStyle.h"
 #include "RemoteControlEditorCommands.h"
+#include "RemoteControlEditorSettings.h"
+#include "RemoteControlWebSocketServer.h"
 #include "Misc/MessageDialog.h"
 #include "ToolMenus.h"
-
-static const FName RemoteControlEditorTabName("RemoteControlEditor");
 
 #define LOCTEXT_NAMESPACE "FRemoteControlEditorModule"
 
 void FRemoteControlEditorModule::StartupModule()
 {
-	// This code will execute after your module is loaded into memory; the exact timing is specified in the .uplugin file per-module
-	
 	FRemoteControlEditorStyle::Initialize();
 	FRemoteControlEditorStyle::ReloadTextures();
 
 	FRemoteControlEditorCommands::Register();
-	
+
 	PluginCommands = MakeShareable(new FUICommandList);
-
 	PluginCommands->MapAction(
-		FRemoteControlEditorCommands::Get().PluginAction,
-		FExecuteAction::CreateRaw(this, &FRemoteControlEditorModule::PluginButtonClicked),
-		FCanExecuteAction());
+		FRemoteControlEditorCommands::Get().RestartAction,
+		FExecuteAction::CreateRaw(this, &FRemoteControlEditorModule::StartWebSocketServer),
+		FCanExecuteAction()
+	);
+	PluginCommands->MapAction(
+		FRemoteControlEditorCommands::Get().SettingsAction,
+		FExecuteAction::CreateRaw(this, &FRemoteControlEditorModule::OpenSettingsPanel),
+		FCanExecuteAction()
+	);
 
-	UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FRemoteControlEditorModule::RegisterMenus));
+	UToolMenus::RegisterStartupCallback(
+		FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FRemoteControlEditorModule::RegisterMenus));
+
+	if (ISettingsModule* SettingsModule = FModuleManager::GetModulePtr<ISettingsModule>("Settings"))
+	{
+		SettingsModule->RegisterSettings("Editor", "Plugins", "RemoteControlEditorSettings",
+		                                 LOCTEXT("EditorSettingsName", "Remote Control Editor"),
+		                                 LOCTEXT("EditorSettingsDesc", ""),
+		                                 GetMutableDefault<URemoteControlEditorSettings>());
+	}
 }
 
 void FRemoteControlEditorModule::ShutdownModule()
 {
-	// This function may be called during shutdown to clean up your module.  For modules that support dynamic reloading,
-	// we call this function before unloading the module.
-
 	UToolMenus::UnRegisterStartupCallback(this);
 
 	UToolMenus::UnregisterOwner(this);
@@ -43,42 +54,90 @@ void FRemoteControlEditorModule::ShutdownModule()
 	FRemoteControlEditorCommands::Unregister();
 }
 
-void FRemoteControlEditorModule::PluginButtonClicked()
+void FRemoteControlEditorModule::InitWebSocketServer()
 {
-	// Put your "OnButtonClicked" stuff here
-	FText DialogText = FText::Format(
-							LOCTEXT("PluginButtonDialogText", "Add code to {0} in {1} to override this button's actions"),
-							FText::FromString(TEXT("FRemoteControlEditorModule::PluginButtonClicked()")),
-							FText::FromString(TEXT("RemoteControlEditor.cpp"))
-					   );
-	FMessageDialog::Open(EAppMsgType::Ok, DialogText);
+	URemoteControlWebSocketServer* WebSocketServerSubsystem = GEditor->GetEditorSubsystem<
+		URemoteControlWebSocketServer>();
+	if (WebSocketServerSubsystem != nullptr)
+	{
+		WebSocketServerSubsystem->OnWebSocketServerOpen.
+		                          AddRaw(this, &FRemoteControlEditorModule::HandleWebSocketServerOpen);
+		WebSocketServerSubsystem->OnWebSocketServerClosed.AddRaw(
+			this, &FRemoteControlEditorModule::HandleWebSocketServerClosed);
+	}
+	StartWebSocketServer();
 }
 
 void FRemoteControlEditorModule::RegisterMenus()
 {
-	// Owner will be used for cleanup in call to UToolMenus::UnregisterOwner
 	FToolMenuOwnerScoped OwnerScoped(this);
-
 	{
-		UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("LevelEditor.MainMenu.Window");
+		UToolMenu* ToolbarMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.LevelEditorToolBar.User");
 		{
-			FToolMenuSection& Section = Menu->FindOrAddSection("WindowLayout");
-			Section.AddMenuEntryWithCommandList(FRemoteControlEditorCommands::Get().PluginAction, PluginCommands);
-		}
-	}
-
-	{
-		UToolMenu* ToolbarMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.LevelEditorToolBar.PlayToolBar");
-		{
-			FToolMenuSection& Section = ToolbarMenu->FindOrAddSection("PluginTools");
+			FToolMenuSection& Section = ToolbarMenu->FindOrAddSection("RCEComboButton");
 			{
-				FToolMenuEntry& Entry = Section.AddEntry(FToolMenuEntry::InitToolBarButton(FRemoteControlEditorCommands::Get().PluginAction));
+				FToolMenuEntry Entry = FToolMenuEntry::InitComboButton(
+					"RCEComboButton",
+					FUIAction(),
+					FOnGetContent::CreateLambda([&]()-> TSharedRef<SWidget, ESPMode::ThreadSafe>
+					{
+						FMenuBuilder MenuBuilder(true, PluginCommands);
+						MenuBuilder.BeginSection("RemoteControlEditor",LOCTEXT("WebSocket", "WebSocket"));
+						MenuBuilder.AddMenuEntry(FRemoteControlEditorCommands::Get().RestartAction);
+						MenuBuilder.EndSection();
+						MenuBuilder.AddMenuEntry(FRemoteControlEditorCommands::Get().SettingsAction);
+						return MenuBuilder.MakeWidget();
+					}),
+					TAttribute<FText>(),
+					LOCTEXT("RemoteControlEditorMenuTooltip", "WebSocket Status"),
+					FSlateIcon(FRemoteControlEditorStyle::GetStyleSetName(), "RemoteControlEditor.PluginAction"),
+					false,
+					"RemoteControlEditorMenu"
+				);
+				Entry.StyleNameOverride = "CalloutToolbar";
 				Entry.SetCommandList(PluginCommands);
+				Section.AddEntry(Entry);
 			}
 		}
 	}
 }
 
+void FRemoteControlEditorModule::StartWebSocketServer()
+{
+	URemoteControlWebSocketServer* WebSocketServerSubsystem = GEditor->GetEditorSubsystem<
+		URemoteControlWebSocketServer>();
+	if (WebSocketServerSubsystem == nullptr)
+	{
+		return;
+	}
+	WebSocketServerSubsystem->RestartWebSocketServer();
+}
+
+void FRemoteControlEditorModule::HandleWebSocketServerOpen()
+{
+	UToolMenu* ToolbarMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.LevelEditorToolBar.User");
+	FToolMenuSection& Section = ToolbarMenu->FindOrAddSection("RCEComboButton");
+	FToolMenuEntry* Entry = Section.FindEntry("RCEComboButton");
+	Entry->Icon = FSlateIcon(FRemoteControlEditorStyle::GetStyleSetName(),
+	                         "RemoteControlEditor.PluginAction.Connected");
+}
+
+void FRemoteControlEditorModule::HandleWebSocketServerClosed()
+{
+	UToolMenu* ToolbarMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.LevelEditorToolBar.User");
+	FToolMenuSection& Section = ToolbarMenu->FindOrAddSection("RCEComboButton");
+	FToolMenuEntry* Entry = Section.FindEntry("RCEComboButton");
+	Entry->Icon = FSlateIcon(FRemoteControlEditorStyle::GetStyleSetName(), "RemoteControlEditor.PluginAction");
+}
+
+void FRemoteControlEditorModule::OpenSettingsPanel()
+{
+	if (ISettingsModule* SettingsModule = FModuleManager::GetModulePtr<ISettingsModule>("Settings"))
+	{
+		SettingsModule->ShowViewer("Editor", "Plugins", "RemoteControlEditorSettings");
+	}
+}
+
 #undef LOCTEXT_NAMESPACE
-	
+
 IMPLEMENT_MODULE(FRemoteControlEditorModule, RemoteControlEditor)

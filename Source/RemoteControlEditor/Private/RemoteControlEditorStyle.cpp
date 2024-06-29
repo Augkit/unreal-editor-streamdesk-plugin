@@ -43,7 +43,8 @@ TSharedRef< FSlateStyleSet > FRemoteControlEditorStyle::Create()
 	TSharedRef< FSlateStyleSet > Style = MakeShareable(new FSlateStyleSet("RemoteControlEditorStyle"));
 	Style->SetContentRoot(IPluginManager::Get().FindPlugin("RemoteControlEditor")->GetBaseDir() / TEXT("Resources"));
 
-	Style->Set("RemoteControlEditor.PluginAction", new IMAGE_BRUSH_SVG(TEXT("PlaceholderButtonIcon"), Icon20x20));
+	Style->Set("RemoteControlEditor.PluginAction", new IMAGE_BRUSH_SVG(TEXT("disconnected"), Icon20x20));
+	Style->Set("RemoteControlEditor.PluginAction.Connected", new IMAGE_BRUSH_SVG(TEXT("connected"), Icon20x20));
 	return Style;
 }
 
